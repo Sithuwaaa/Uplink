@@ -1,13 +1,13 @@
 {
-  "name": "OnAir \u2014 Work & Site Tracker",
-  "short_name": "OnAir",
+  "name": "Uplink \u2014 Work & Site Tracker",
+  "short_name": "Uplink",
   "description": "Attendance, working hours and telecom site visit tracker",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0C1319",
-  "theme_color": "#101C26",
+  "background_color": "#0A1220",
+  "theme_color": "#0A1220",
   "icons": [
     {
       "src": "icon-192.png",
