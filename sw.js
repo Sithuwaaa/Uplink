@@ -1,5 +1,5 @@
 /* Field Log service worker — offline app shell + silent updates */
-const CACHE = "onair-v4";
+const CACHE = "onair-v5";
 const ASSETS = [
   "./",
   "./index.html",
