@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OnAir — Work & Site Tracker</title>
+<meta name="theme-color" content="#101C26">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<style>
+:root{
+  --bg:#F2F5F7; --card:#FFFFFF; --ink:#17242D; --muted:#5C6B77; --line:#D9E1E7;
+  --office:#0E62B4; --site:#D97706; --mixed:#7C3AED; --wfh:#0D9488; --leave:#64748B;
+  --accent:#D97706; --accent-ink:#7C3E00; --ok:#15803D; --warn:#B45309; --err:#B91C1C;
+  --field:var(--field); --track:#EDF1F4; --chip-bg:#FFF4E3; --chip-line:#F3CE96; --chip-ink:#7C3E00;
+  --mono:ui-monospace,'Cascadia Mono','SF Mono',Consolas,Menlo,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --radius:14px; --shadow:0 1px 3px rgba(23,36,45,.08),0 4px 14px rgba(23,36,45,.05);
+}
+
+[data-theme="dark"]{
+  --bg:#0C1319; --card:#141E27; --ink:#E6EDF3; --muted:#8CA0AF; --line:#243240;
+  --field:#0F1922; --track:#1E2A35; --chip-bg:#2B2213; --chip-line:#6B4E1B; --chip-ink:#F3C173;
+  --ok:#4ADE80; --warn:#FBBF24; --err:#F87171;
+  --shadow:0 1px 3px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+}
+html,body{transition:background .2s,color .2s}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--ink)}
+
+/* ---------- header ---------- */
+header{background:#101C26;color:#E8EEF3;padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20}
+.logo{display:flex;align-items:flex-end;gap:2px;height:20px}
+.logo span{width:4px;background:var(--accent);border-radius:1px;display:block}
+.logo span:nth-child(1){height:6px}.logo span:nth-child(2){height:10px}
+.logo span:nth-child(3){height:14px}.logo span:nth-child(4){height:19px}
+header h1{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:.14em}
+.syncpill{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:#8FA3B3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);padding:4px 10px;border-radius:14px;cursor:pointer}
+.dot{width:8px;height:8px;border-radius:50%;background:#64748B;flex:none}
+.dot.ok{background:#22C55E}.dot.pending{background:#F59E0B}.dot.err{background:#EF4444}
+.dot.syncing{background:#38BDF8;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.storage-warn{background:#7C2D12;color:#FED7AA;font-size:12px;padding:6px 16px;display:none}
+
+/* ---------- layout ---------- */
+main{max-width:880px;margin:0 auto;padding:16px 12px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+.card h2{font-size:13px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ---------- form ---------- */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.grid .full{grid-column:1/-1}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+input[type=date],input[type=time],input[type=text],input[type=password],select,textarea{
+  width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--office);outline-offset:1px;border-color:transparent}
+textarea{resize:vertical;min-height:64px}
+
+.time-row{display:flex;gap:6px}
+.time-row input{flex:1}
+.now-btn{padding:0 12px;border:1px solid var(--line);background:#101C26;color:#FFD9A0;border-radius:8px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.05em}
+.now-btn:active{transform:scale(.96)}
+
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{padding:8px 12px;border:1px solid var(--line);border-radius:20px;background:var(--field);font-size:13px;font-weight:600;color:var(--muted)}
+.seg button.on{color:#fff;border-color:transparent}
+.seg button.on[data-v="Office"]{background:var(--office)}
+.seg button.on[data-v="Site Visit"]{background:var(--site)}
+.seg button.on[data-v="Office + Site"]{background:var(--mixed)}
+.seg button.on[data-v="WFH"]{background:var(--wfh)}
+.seg button.on[data-v="Leave"]{background:var(--leave)}
+
+.chipbox{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field);min-height:44px}
+.chipbox input{border:none;background:transparent;flex:1;min-width:110px;padding:4px;text-transform:uppercase;font-family:var(--mono)}
+.chipbox input:focus{outline:none}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip-bg);border:1px solid var(--chip-line);color:var(--chip-ink);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:13px;font-weight:600}
+.chip b{cursor:pointer;font-weight:700;color:#B45309}
+.suggest{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.suggest button{font-family:var(--mono);font-size:12px;padding:3px 8px;border:1px dashed var(--line);border-radius:6px;background:transparent;color:var(--muted)}
+
+.actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.btn{padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:var(--field);font-weight:700;font-size:14px}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:active{transform:scale(.98)}
+.btn.ghost{color:var(--muted)}
+
+/* ---------- sync settings ---------- */
+#syncCard .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+#syncStatusLine{font-size:13px;margin-top:10px;font-family:var(--mono)}
+#syncStatusLine.ok{color:var(--ok)}#syncStatusLine.pending{color:var(--warn)}#syncStatusLine.err{color:var(--err)}
+
+/* ---------- stats ---------- */
+.month-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.month-bar select{width:auto;font-family:var(--mono);font-weight:600}
+.month-bar .spacer{flex:1}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat .v{font-family:var(--mono);font-size:24px;font-weight:700}
+.stat .k{font-size:11px;color:var(--muted);margin-top:2px}
+.topsites{margin-top:10px;font-size:13px;color:var(--muted)}
+.topsites .chip{margin:2px 3px 0 0}
+
+/* ---------- entries ---------- */
+.entry{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);margin-bottom:10px;overflow:hidden}
+.entry-head{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
+.d-date{font-family:var(--mono);font-weight:700;font-size:14px}
+.d-dow{font-size:12px;color:var(--muted)}
+.badge{font-size:11px;font-weight:700;color:#fff;padding:3px 9px;border-radius:12px;letter-spacing:.03em}
+.badge.Office{background:var(--office)}
+.badge.SiteVisit{background:var(--site)}
+.badge.OfficeSite{background:var(--mixed)}
+.badge.WFH{background:var(--wfh)}
+.badge.Leave{background:var(--leave)}
+.d-hours{font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:auto}
+.d-hours b{color:var(--ink)}
+.entry-body{padding:0 12px 12px}
+.timebar{position:relative;height:8px;background:var(--track);border-radius:4px;margin:2px 0 10px}
+.timebar .fill{position:absolute;top:0;bottom:0;border-radius:4px;opacity:.85}
+.timebar .tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--line)}
+.summary{font-size:14px;color:var(--ink);white-space:pre-wrap}
+.entry .sites{margin:6px 0 8px}
+.entry .sites .chip{margin:2px 4px 0 0}
+.entry-tools{display:flex;gap:10px;margin-top:8px}
+.entry-tools button{background:none;border:none;font-size:12px;font-weight:700;color:var(--muted);text-decoration:underline;padding:2px}
+.entry-tools button.del{color:#B91C1C}
+.month-label{font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--muted);margin:18px 2px 8px;text-transform:uppercase}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:14px}
+
+.searchbar{display:flex;gap:8px;margin-bottom:12px}
+.searchbar input{flex:1}
+
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:#101C26;color:#fff;
+  padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;transition:transform .25s;z-index:50}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+
+/* ---------- pages & bottom tab bar ---------- */
+main{padding-bottom:96px}
+.page{display:none}
+.page.active{display:block}
+#tabbar{position:fixed;bottom:0;left:0;right:0;background:#101C26;display:flex;justify-content:space-around;
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom));z-index:30;border-top:1px solid rgba(255,255,255,.08)}
+#tabbar button{background:none;border:none;color:#8FA3B3;font-size:11px;font-weight:700;display:flex;
+  flex-direction:column;align-items:center;gap:3px;padding:4px 16px;border-radius:10px;font-family:var(--mono);letter-spacing:.04em}
+#tabbar button svg{width:20px;height:20px;stroke:currentColor}
+#tabbar button.on{color:#F5B04C}
+#todayInfo .d-date{font-size:16px}
+#todayInfo .today-status{margin-top:8px;font-size:14px}
+#todayInfo .today-status.muted{color:var(--muted)}
+#todayInfo .sites{margin-top:6px}
+#todayInfo .badge{margin-right:6px}
+
+
+/* ---------- OnAir look ---------- */
+.mark{width:26px;height:26px;flex:none}
+.themebtn{margin-left:8px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.06);color:#E8EEF3;font-size:16px;line-height:1}
+.page.active{animation:pagein .18s ease}
+@keyframes pagein{from{opacity:0;transform:translateY(5px)}}
+#fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;
+  border:none;background:var(--accent);color:#fff;font-size:30px;font-weight:400;line-height:1;
+  box-shadow:0 4px 14px rgba(217,119,6,.45);z-index:29;display:flex;align-items:center;justify-content:center}
+#fab:active{transform:scale(.94)}
+.onair-pill{display:inline-flex;align-items:center;gap:7px;margin-left:10px;padding:3px 11px;border-radius:14px;
+  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#22C55E;
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;vertical-align:middle}
+.onair-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;animation:onairpulse 1.4s infinite}
+@keyframes onairpulse{50%{opacity:.3}}
+
+@media (max-width:560px){
+  .grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  header h1{font-size:14px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="3" fill="#F5A623"/>
+    <path d="M6.8 8.2a6 6 0 0 0 0 7.6M17.2 8.2a6 6 0 0 1 0 7.6" stroke="#F5A623" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+    <path d="M4 5.6a10 10 0 0 0 0 12.8M20 5.6a10 10 0 0 1 0 12.8" stroke="#F5A623" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".65"/>
+  </svg>
+  <h1>ONAIR</h1>
+  <button class="syncpill" id="syncPill" title="Cloud sync status — tap to sync now">
+    <span class="dot" id="syncDot"></span><span id="syncText">local only</span>
+  </button>
+  <button class="themebtn" id="themeBtn" title="Switch light / dark theme">☾</button>
+</header>
+<div class="storage-warn" id="storageWarn">⚠ Storage unavailable in this preview — entries won't be saved after closing. Download the file and open it in your browser for permanent saving.</div>
+
+<main>
+
+<!-- ============ PAGE: DASHBOARD ============ -->
+<div class="page active" id="page-dashboard">
+  <section class="card" id="todayCard">
+    <h2>Today</h2>
+    <div id="todayInfo"></div>
+    <div class="actions"><button class="btn primary" id="goLog">Log today →</button></div>
+  </section>
+  <section class="card">
+  <h2>Month summary</h2>
+  <div class="month-bar">
+    <select id="monthSel"></select>
+    <div class="spacer"></div>
+    <button class="btn" id="csvBtn">Export CSV</button>
+    <button class="btn" id="bakBtn">Backup</button>
+    <button class="btn" id="restoreBtn">Restore</button>
+    <input type="file" id="restoreFile" accept=".json" style="display:none">
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="topsites" id="topSites"></div>
+</section>
+</div>
+
+<!-- ============ PAGE: LOG ============ -->
+<div class="page" id="page-log">
+  <section class="card" id="formCard">
+  <h2 id="formTitle">Log today</h2>
+  <div class="grid">
+    <div>
+      <label for="fDate">Date</label>
+      <input type="date" id="fDate">
+    </div>
+    <div>
+      <label>Day type</label>
+      <div class="seg" id="fType">
+        <button type="button" data-v="Office">Office</button>
+        <button type="button" data-v="Site Visit" class="on">Site Visit</button>
+        <button type="button" data-v="Office + Site">Office + Site</button>
+        <button type="button" data-v="WFH">WFH</button>
+        <button type="button" data-v="Leave">Leave</button>
+      </div>
+    </div>
+    <div>
+      <label for="fStart">Start work</label>
+      <div class="time-row">
+        <input type="time" id="fStart">
+        <button type="button" class="now-btn" id="startNow">NOW</button>
+      </div>
+    </div>
+    <div>
+      <label for="fEnd">End work</label>
+      <div class="time-row">
+        <input type="time" id="fEnd">
+        <button type="button" class="now-btn" id="endNow">NOW</button>
+      </div>
+    </div>
+    <div class="full" id="siteField">
+      <label for="fSiteInput">Sites attended (type ID, press Enter — e.g. GL900, ZKAD11)</label>
+      <div class="chipbox" id="chipbox">
+        <input type="text" id="fSiteInput" autocomplete="off" placeholder="SITE ID">
+      </div>
+      <div class="suggest" id="siteSuggest"></div>
+    </div>
+    <div class="full">
+      <label for="fSummary">What I did</label>
+      <textarea id="fSummary" placeholder="e.g. LMT commissioning at GL900, VSWR check on Sector 2, material handover…"></textarea>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="saveBtn">Save entry</button>
+    <button class="btn ghost" id="cancelEdit" style="display:none">Cancel edit</button>
+  </div>
+</section>
+</div>
+
+<!-- ============ PAGE: ENTRIES ============ -->
+<div class="page" id="page-entries">
+  <section>
+  <div class="searchbar">
+    <input type="text" id="search" placeholder="Search entries — site ID, keyword…">
+  </div>
+  <div id="entryList"></div>
+</section>
+</div>
+
+<!-- ============ PAGE: SYNC ============ -->
+<div class="page" id="page-sync">
+  <section class="card" id="syncCard">
+  <h2>Cloud sync — Google Sheet</h2>
+  <div class="grid">
+    <div class="full">
+      <label for="cfgUrl">Apps Script web app URL</label>
+      <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <div>
+      <label for="cfgToken">Sync token (same as in the script)</label>
+      <input type="password" id="cfgToken" placeholder="your secret token">
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="saveCfg">Save settings</button>
+    <button class="btn" id="syncNowBtn">Sync now</button>
+  </div>
+  <div id="syncStatusLine"></div>
+  <div class="hint">One-time setup: create a Google Sheet → Extensions → Apps Script → paste the Code.gs provided → set your token → Deploy as web app (Execute as: Me, Access: Anyone) → paste the /exec URL and token here on every device. Entries then sync automatically whenever you save and whenever you open the app — and queue safely when you're offline at a site.</div>
+</section>
+</div>
+
+</main>
+
+<button id="fab" title="Log an entry">+</button>
+
+<nav id="tabbar">
+  <button data-page="dashboard" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+    Home</button>
+  <button data-page="log">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+    Log</button>
+  <button data-page="entries">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    Entries</button>
+  <button data-page="sync">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M7 18a5 5 0 0 1-.9-9.92 6 6 0 0 1 11.6 1.5A4.5 4.5 0 0 1 17 18H7z"/></svg>
+    Sync</button>
+</nav>
+
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------------- storage (localStorage with in-memory fallback) ---------------- */
+const KEY="fieldlog-v1", CFGKEY="fieldlog-cfg";
+let memStore=null, memCfg=null;
+function loadData(){
+  try{ const raw=localStorage.getItem(KEY); return raw?JSON.parse(raw):{entries:[]}; }
+  catch(e){ document.getElementById("storageWarn").style.display="block";
+    return memStore||{entries:[]}; }
+}
+function saveData(d){
+  try{ localStorage.setItem(KEY,JSON.stringify(d)); }
+  catch(e){ memStore=d; document.getElementById("storageWarn").style.display="block"; }
+}
+function loadCfg(){
+  try{ const raw=localStorage.getItem(CFGKEY); return raw?JSON.parse(raw):{}; }
+  catch(e){ return memCfg||{}; }
+}
+function saveCfgStore(c){
+  try{ localStorage.setItem(CFGKEY,JSON.stringify(c)); }catch(e){ memCfg=c; }
+}
+let data=loadData(); if(!Array.isArray(data.entries)) data={entries:[]};
+let cfg=loadCfg();
+
+/* ---------------- helpers ---------------- */
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());};
+const nowTime=()=>{const d=new Date();return pad(d.getHours())+":"+pad(d.getMinutes());};
+const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDate(s){const [y,m,d]=s.split("-");return d+" "+MON[+m-1]+" "+y;}
+function dow(s){return DOW[new Date(s+"T00:00:00").getDay()];}
+function live(){return data.entries.filter(e=>!e.deleted);}
+function hours(e){
+  if(!e.start||!e.end) return null;
+  const [sh,sm]=e.start.split(":").map(Number),[eh,em]=e.end.split(":").map(Number);
+  let mins=(eh*60+em)-(sh*60+sm); if(mins<0) mins+=24*60;
+  return mins/60;
+}
+function fmtH(h){ if(h==null) return "—"; const hh=Math.floor(h),mm=Math.round((h-hh)*60); return hh+"h "+(mm?mm+"m":"").trim(); }
+function typeClass(t){return t.replace(/[^A-Za-z]/g,"");}
+function typeColor(t){return {Office:"var(--office)","Site Visit":"var(--site)","Office + Site":"var(--mixed)",WFH:"var(--wfh)",Leave:"var(--leave)"}[t]||"var(--leave)";}
+function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function knownSites(){
+  const c={}; live().forEach(e=>(e.sites||[]).forEach(s=>c[s]=(c[s]||0)+1));
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]);
+}
+function sortEntries(){
+  data.entries.sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
+}
+
+/* ---------------- cloud sync ---------------- */
+let dirty=!!cfg.dirty, syncing=false;
+function setDirty(v){ dirty=v; cfg.dirty=v; saveCfgStore(cfg); paintSync(); }
+function paintSync(state){
+  const dot=$("syncDot"), txt=$("syncText"), line=$("syncStatusLine");
+  if(!cfg.url){ dot.className="dot"; txt.textContent="local only"; line.textContent=""; line.className=""; return; }
+  if(state==="syncing"){ dot.className="dot syncing"; txt.textContent="syncing…"; return; }
+  if(dirty){ dot.className="dot pending"; txt.textContent="pending sync";
+    line.textContent="● Changes waiting to sync — will retry automatically."; line.className="pending"; }
+  else if(cfg.lastSync){ dot.className="dot ok";
+    const d=new Date(cfg.lastSync); txt.textContent="synced "+pad(d.getHours())+":"+pad(d.getMinutes());
+    line.textContent="✓ Synced with Google Sheet at "+d.toLocaleString(); line.className="ok"; }
+  else { dot.className="dot"; txt.textContent="not synced yet"; line.textContent=""; line.className=""; }
+}
+function mergeEntries(a,b){
+  const map={};
+  a.concat(b).forEach(e=>{
+    if(!e||!e.id) return;
+    const cur=map[e.id];
+    if(!cur||(Number(e.updated)||0)>=(Number(cur.updated)||0)) map[e.id]=e;
+  });
+  return Object.values(map);
+}
+async function syncNow(silent){
+  if(!cfg.url){ if(!silent){toast("Add your sync URL in Cloud Sync settings below");showPage("sync");} return; }
+  if(syncing) return; syncing=true; paintSync("syncing");
+  try{
+    const res=await fetch(cfg.url,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({token:cfg.token||"",entries:data.entries})
+    });
+    const j=await res.json();
+    if(!j.ok) throw new Error(j.error||"sync failed");
+    data.entries=mergeEntries(data.entries,j.entries||[]);
+    sortEntries(); saveData(data);
+    cfg.lastSync=Date.now(); setDirty(false);
+    renderAll();
+    if(!silent) toast("Synced with Google Sheet ✓");
+  }catch(e){
+    setDirty(true);
+    if(!silent) toast(String(e.message||"").includes("token")?"Sync failed — token doesn't match the script":"Sync failed — will retry when online");
+  }
+  syncing=false; paintSync();
+}
+function queueSync(){ setDirty(true); if(navigator.onLine!==false) syncNow(true); }
+window.addEventListener("online",()=>{ if(dirty) syncNow(true); });
+$("syncPill").addEventListener("click",()=>syncNow(false));
+$("syncNowBtn").addEventListener("click",()=>syncNow(false));
+$("saveCfg").addEventListener("click",()=>{
+  cfg.url=$("cfgUrl").value.trim();
+  cfg.token=$("cfgToken").value;
+  saveCfgStore(cfg); paintSync();
+  toast(cfg.url?"Sync settings saved":"Sync turned off (URL cleared)");
+  if(cfg.url) syncNow(false);
+});
+
+/* ---------------- form state ---------------- */
+let formSites=[], editId=null;
+
+function setType(v){
+  document.querySelectorAll("#fType button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  const needSites=(v==="Site Visit"||v==="Office + Site");
+  $("siteField").style.opacity=needSites?"1":".55";
+}
+function getType(){const b=document.querySelector("#fType button.on");return b?b.dataset.v:"Site Visit";}
+document.querySelectorAll("#fType button").forEach(b=>b.addEventListener("click",()=>setType(b.dataset.v)));
+
+function renderChips(){
+  const box=$("chipbox"), inp=$("fSiteInput");
+  box.querySelectorAll(".chip").forEach(c=>c.remove());
+  formSites.forEach((s,i)=>{
+    const c=document.createElement("span");c.className="chip";
+    c.innerHTML=esc(s)+' <b title="Remove">×</b>';
+    c.querySelector("b").addEventListener("click",()=>{formSites.splice(i,1);renderChips();});
+    box.insertBefore(c,inp);
+  });
+  renderSuggest();
+}
+function addSite(raw){
+  raw.split(/[,\s]+/).forEach(p=>{
+    const s=p.trim().toUpperCase();
+    if(s && !formSites.includes(s)) formSites.push(s);
+  });
+  $("fSiteInput").value=""; renderChips();
+}
+$("fSiteInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"||e.key===","){e.preventDefault();addSite(e.target.value);}
+  else if(e.key==="Backspace"&&!e.target.value&&formSites.length){formSites.pop();renderChips();}
+});
+$("fSiteInput").addEventListener("blur",e=>{if(e.target.value.trim())addSite(e.target.value);});
+function renderSuggest(){
+  const box=$("siteSuggest");box.innerHTML="";
+  knownSites().filter(s=>!formSites.includes(s)).slice(0,8).forEach(s=>{
+    const b=document.createElement("button");b.type="button";b.textContent="+ "+s;
+    b.addEventListener("click",()=>addSite(s));box.appendChild(b);
+  });
+}
+
+$("startNow").addEventListener("click",()=>{$("fStart").value=nowTime();toast("Start time stamped "+nowTime());});
+$("endNow").addEventListener("click",()=>{$("fEnd").value=nowTime();toast("End time stamped "+nowTime());});
+
+function resetForm(){
+  $("fDate").value=todayStr(); $("fStart").value=""; $("fEnd").value="";
+  $("fSummary").value=""; formSites=[]; editId=null;
+  setType("Site Visit"); renderChips();
+  $("formTitle").textContent="Log today"; $("saveBtn").textContent="Save entry";
+  $("cancelEdit").style.display="none";
+}
+$("cancelEdit").addEventListener("click",resetForm);
+
+$("saveBtn").addEventListener("click",()=>{
+  const date=$("fDate").value;
+  if(!date){toast("Pick a date");return;}
+  if($("fSiteInput").value.trim()) addSite($("fSiteInput").value);
+  const entry={
+    id: editId || (Date.now()+"-"+Math.random().toString(36).slice(2,7)),
+    date, type:getType(),
+    start:$("fStart").value, end:$("fEnd").value,
+    sites:formSites.slice(), summary:$("fSummary").value.trim(),
+    updated: Date.now()
+  };
+  if(editId){
+    const i=data.entries.findIndex(e=>e.id===editId);
+    if(i>-1) data.entries[i]=entry;
+  } else data.entries.push(entry);
+  sortEntries(); saveData(data);
+  toast(editId?"Entry updated":"Entry saved — "+fmtDate(date));
+  resetForm(); renderAll(); queueSync(); showPage("entries");
+});
+
+/* ---------------- month selector & stats ---------------- */
+function months(){
+  const set=new Set(live().map(e=>e.date.slice(0,7)));
+  set.add(todayStr().slice(0,7));
+  return [...set].sort().reverse();
+}
+function renderMonthSel(){
+  const sel=$("monthSel"),cur=sel.value;
+  sel.innerHTML="";
+  months().forEach(m=>{
+    const o=document.createElement("option");o.value=m;
+    const [y,mm]=m.split("-");o.textContent=MON[+mm-1]+" "+y;
+    sel.appendChild(o);
+  });
+  sel.value=(cur&&[...sel.options].some(o=>o.value===cur))?cur:months()[0];
+}
+$("monthSel").addEventListener("change",renderStats);
+
+function renderStats(){
+  const m=$("monthSel").value;
+  const es=live().filter(e=>e.date.slice(0,7)===m);
+  const worked=es.filter(e=>e.type!=="Leave");
+  const siteDays=es.filter(e=>e.type==="Site Visit"||e.type==="Office + Site").length;
+  const officeDays=es.filter(e=>e.type==="Office"||e.type==="Office + Site").length;
+  const totH=worked.reduce((a,e)=>a+(hours(e)||0),0);
+  const siteCount={}; let visits=0;
+  es.forEach(e=>(e.sites||[]).forEach(s=>{siteCount[s]=(siteCount[s]||0)+1;visits++;}));
+  const uniq=Object.keys(siteCount).length;
+  $("stats").innerHTML=
+    st(worked.length,"days worked")+st(siteDays,"site days")+
+    st(officeDays,"office days")+st(es.filter(e=>e.type==="Leave").length,"leave")+
+    st(fmtH(totH),"total hours")+st(worked.length?fmtH(totH/worked.length):"—","avg / day")+
+    st(visits,"site visits")+st(uniq,"unique sites");
+  const top=Object.entries(siteCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  $("topSites").innerHTML=top.length
+    ? "Most visited: "+top.map(([s,c])=>'<span class="chip">'+esc(s)+" ×"+c+"</span>").join("")
+    : "";
+  function st(v,k){return '<div class="stat"><div class="v">'+v+'</div><div class="k">'+k+'</div></div>';}
+}
+
+/* ---------------- entry list ---------------- */
+$("search").addEventListener("input",renderList);
+
+function timebar(e){
+  const h=hours(e); if(h==null) return "";
+  const DAY_S=6*60, DAY_E=22*60, span=DAY_E-DAY_S;
+  const [sh,sm]=e.start.split(":").map(Number);
+  const s=Math.max(DAY_S,Math.min(DAY_E,sh*60+sm));
+  const w=Math.max(2,Math.min(100,(h*60/span)*100));
+  const l=((s-DAY_S)/span)*100;
+  let ticks="";for(let t=8;t<=20;t+=4){ticks+='<span class="tick" style="left:'+(((t*60-DAY_S)/span)*100)+'%"></span>';}
+  return '<div class="timebar">'+ticks+'<span class="fill" style="left:'+l+'%;width:'+Math.min(w,100-l)+'%;background:'+typeColor(e.type)+'"></span></div>';
+}
+
+function renderList(){
+  const q=$("search").value.trim().toLowerCase();
+  const list=$("entryList"); list.innerHTML="";
+  let es=live();
+  if(q) es=es.filter(e=>
+    (e.summary||"").toLowerCase().includes(q)||
+    (e.sites||[]).some(s=>s.toLowerCase().includes(q))||
+    e.date.includes(q)||e.type.toLowerCase().includes(q));
+  if(!es.length){list.innerHTML='<div class="empty">'+(q?"No entries match your search.":"No entries yet — log your first day above.")+"</div>";return;}
+  let lastMonth="";
+  es.forEach(e=>{
+    const m=e.date.slice(0,7);
+    if(m!==lastMonth){
+      lastMonth=m;const [y,mm]=m.split("-");
+      const lab=document.createElement("div");lab.className="month-label";
+      lab.textContent=MON[+mm-1]+" "+y;list.appendChild(lab);
+    }
+    const div=document.createElement("div");div.className="entry";
+    const h=hours(e);
+    div.innerHTML=
+      '<div class="entry-head">'+
+        '<span class="d-date">'+fmtDate(e.date)+'</span>'+
+        '<span class="d-dow">'+dow(e.date)+'</span>'+
+        '<span class="badge '+typeClass(e.type)+'">'+esc(e.type)+'</span>'+
+        '<span class="d-hours">'+(e.start?esc(e.start):"—")+" → "+(e.end?esc(e.end):"—")+
+          (h!=null?' · <b>'+fmtH(h)+'</b>':"")+'</span>'+
+      '</div>'+
+      '<div class="entry-body">'+
+        timebar(e)+
+        ((e.sites&&e.sites.length)?'<div class="sites">'+e.sites.map(s=>'<span class="chip">'+esc(s)+'</span>').join("")+'</div>':"")+
+        (e.summary?'<div class="summary">'+esc(e.summary)+'</div>':"")+
+        '<div class="entry-tools">'+
+          '<button data-a="edit">Edit</button>'+
+          '<button data-a="del" class="del">Delete</button>'+
+        '</div>'+
+      '</div>';
+    div.querySelector('[data-a=edit]').addEventListener("click",()=>startEdit(e.id));
+    div.querySelector('[data-a=del]').addEventListener("click",()=>{
+      if(confirm("Delete entry for "+fmtDate(e.date)+"?")){
+        const i=data.entries.findIndex(x=>x.id===e.id);
+        if(i>-1){ data.entries[i].deleted=true; data.entries[i].updated=Date.now(); }
+        saveData(data);renderAll();toast("Entry deleted");queueSync();
+      }
+    });
+    list.appendChild(div);
+  });
+}
+
+function startEdit(id){
+  const e=data.entries.find(x=>x.id===id); if(!e) return;
+  editId=id;
+  $("fDate").value=e.date; setType(e.type);
+  $("fStart").value=e.start||""; $("fEnd").value=e.end||"";
+  $("fSummary").value=e.summary||"";
+  formSites=(e.sites||[]).slice(); renderChips();
+  $("formTitle").textContent="Edit entry — "+fmtDate(e.date);
+  $("saveBtn").textContent="Update entry";
+  $("cancelEdit").style.display="inline-block";
+  showPage("log");
+}
+
+/* ---------------- export / backup ---------------- */
+function download(name,mime,content){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+$("csvBtn").addEventListener("click",()=>{
+  const rows=[["Date","Day","Type","Start","End","Hours","Sites","Summary"]];
+  live().slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+    const h=hours(e);
+    rows.push([e.date,dow(e.date),e.type,e.start||"",e.end||"",
+      h!=null?h.toFixed(2):"",(e.sites||[]).join("; "),e.summary||""]);
+  });
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  download("field-log-"+todayStr()+".csv","text/csv;charset=utf-8",csv);
+  toast("CSV exported — open it in Excel");
+});
+$("bakBtn").addEventListener("click",()=>{
+  download("field-log-backup-"+todayStr()+".json","application/json",JSON.stringify(data,null,2));
+  toast("Backup file saved");
+});
+$("restoreBtn").addEventListener("click",()=>$("restoreFile").click());
+$("restoreFile").addEventListener("change",ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d||!Array.isArray(d.entries)) throw 0;
+      const before=data.entries.length;
+      data.entries=mergeEntries(data.entries,d.entries);
+      sortEntries(); saveData(data);renderAll();
+      toast("Restore complete — "+Math.max(0,data.entries.length-before)+" entries added");
+      queueSync();
+    }catch(e){toast("That file isn't a valid backup");}
+    ev.target.value="";
+  };
+  r.readAsText(f);
+});
+
+
+/* ---------------- pages / navigation ---------------- */
+const PAGES=["dashboard","log","entries","sync"];
+function showPage(p){
+  PAGES.forEach(x=>$("page-"+x).classList.toggle("active",x===p));
+  document.querySelectorAll("#tabbar button").forEach(b=>b.classList.toggle("on",b.dataset.page===p));
+  $("fab").style.display=(p==="log"||p==="sync")?"none":"flex";
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("#tabbar button").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
+$("goLog").addEventListener("click",()=>{
+  const e=live().find(x=>x.date===todayStr());
+  if(e) startEdit(e.id); else { resetForm(); showPage("log"); }
+});
+function renderToday(){
+  const t=todayStr(), e=live().find(x=>x.date===t), el=$("todayInfo");
+  const head='<span class="d-date">'+fmtDate(t)+'</span> <span class="d-dow">'+dow(t)+'</span>';
+  if(!e){
+    el.innerHTML=head+'<div class="today-status muted">No entry logged yet today.</div>';
+    $("goLog").textContent="Log today →";
+  } else {
+    const h=hours(e);
+    const onair=(e.start&&!e.end)?'<span class="onair-pill"><span class="onair-dot"></span>ON AIR · '+esc(e.start)+'</span>':"";
+    el.innerHTML=head+onair+'<div class="today-status"><span class="badge '+typeClass(e.type)+'">'+esc(e.type)+'</span>'+
+      (e.start||"—")+" → "+(e.end||"—")+(h!=null?" · <b>"+fmtH(h)+"</b>":"")+
+      ((e.sites&&e.sites.length)?'<div class="sites">'+e.sites.map(s=>'<span class="chip">'+esc(s)+'</span>').join("")+'</div>':"")+
+      '</div>';
+    $("goLog").textContent="Edit today\u2019s entry";
+  }
+}
+
+/* ---------------- init ---------------- */
+function renderAll(){renderMonthSel();renderStats();renderList();renderSuggest();renderToday();}
+$("fDate").value=todayStr();
+setType("Site Visit");
+$("cfgUrl").value=cfg.url||"";
+$("cfgToken").value=cfg.token||"";
+const THEMEKEY="onair-theme";
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  $("themeBtn").textContent=(t==="dark")?"☀":"☾";
+  try{localStorage.setItem(THEMEKEY,t);}catch(e){}
+}
+let _th=null; try{_th=localStorage.getItem(THEMEKEY);}catch(e){}
+applyTheme(_th||"dark");
+$("themeBtn").addEventListener("click",()=>applyTheme(document.documentElement.dataset.theme==="dark"?"light":"dark"));
+$("fab").addEventListener("click",()=>{resetForm();showPage("log");});
+renderAll(); paintSync();
+if(cfg.url) syncNow(true);
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
