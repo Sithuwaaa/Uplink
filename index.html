@@ -15,7 +15,7 @@
   --office:#0E62B4; --site:#D97706; --mixed:#7C3AED; --wfh:#0D9488; --leave:#64748B;
   --accent:#0284C7; --accent-ink:#075985; --ok:#15803D; --warn:#B45309; --err:#B91C1C;
   --field:#FBFCFD; --track:#EDF1F4; --chip-bg:#E0F2FE; --chip-line:#7DD3FC; --chip-ink:#075985;
-  --dayoff:#E11D48; --btnp-bg:#17242D; --btnp-fg:#FFFFFF;
+  --dayoff:#E11D48; --wh:#8B5CF6; --btnp-bg:#17242D; --btnp-fg:#FFFFFF;
   color-scheme:light;
   --mono:ui-monospace,'Cascadia Mono','SF Mono',Consolas,Menlo,monospace;
   --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -79,6 +79,8 @@ textarea{resize:vertical;min-height:64px}
 .seg button.on[data-v="Office + Site"]{background:var(--mixed)}
 .seg button.on[data-v="WFH"]{background:var(--wfh)}
 .seg button.on[data-v="Leave"]{background:var(--leave)}
+.seg button.on[data-v="Site"]{background:var(--site)}
+.seg button.on[data-v="WH"]{background:var(--wh)}
 .seg button.on[data-v="Day Off"]{background:var(--dayoff)}
 
 .chipbox{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field);min-height:44px}
@@ -123,6 +125,8 @@ textarea{resize:vertical;min-height:64px}
 .badge.WFH{background:var(--wfh)}
 .badge.Leave{background:var(--leave)}
 .badge.DayOff{background:var(--dayoff)}
+.badge.Site{background:var(--site)}
+.badge.WH{background:var(--wh)}
 .d-hours{font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:auto}
 .d-hours b{color:var(--ink)}
 .entry-body{padding:0 12px 12px}
@@ -256,11 +260,11 @@ main{padding-bottom:96px}
       <input type="date" id="fDate">
     </div>
     <div>
-      <label>Day type</label>
+      <label>Day type — tap all that apply</label>
       <div class="seg" id="fType">
         <button type="button" data-v="Office">Office</button>
-        <button type="button" data-v="Site Visit" class="on">Site Visit</button>
-        <button type="button" data-v="Office + Site">Office + Site</button>
+        <button type="button" data-v="WH">WH</button>
+        <button type="button" data-v="Site" class="on">Site</button>
         <button type="button" data-v="WFH">WFH</button>
         <button type="button" data-v="Leave">Leave</button>
         <button type="button" data-v="Day Off">Day Off</button>
@@ -396,7 +400,7 @@ function hours(e){
 }
 function fmtH(h){ if(h==null) return "—"; const hh=Math.floor(h),mm=Math.round((h-hh)*60); return hh+"h "+(mm?mm+"m":"").trim(); }
 function typeClass(t){return t.replace(/[^A-Za-z]/g,"");}
-function typeColor(t){return {Office:"var(--office)","Site Visit":"var(--site)","Office + Site":"var(--mixed)",WFH:"var(--wfh)",Leave:"var(--leave)","Day Off":"var(--dayoff)"}[t]||"var(--leave)";}
+function typeColor(t){return {Office:"var(--office)",Site:"var(--site)","Site Visit":"var(--site)",WH:"var(--wh)","Office + Site":"var(--mixed)",WFH:"var(--wfh)",Leave:"var(--leave)","Day Off":"var(--dayoff)"}[t]||"var(--leave)";}
 function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function knownSites(){
@@ -467,13 +471,37 @@ $("saveCfg").addEventListener("click",()=>{
 /* ---------------- form state ---------------- */
 let formSites=[], editId=null;
 
-function setType(v){
-  document.querySelectorAll("#fType button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
-  const needSites=(v==="Site Visit"||v==="Office + Site");
-  $("siteField").style.opacity=needSites?"1":".55";
+const TYPE_ORDER=["Office","WH","Site","WFH","Leave","Day Off"];
+const EXCLUSIVE=["Leave","Day Off"];
+function typesOf(t){
+  if(!t) return [];
+  return String(t).split(" + ").map(x=>x==="Site Visit"?"Site":x).filter(Boolean);
 }
-function getType(){const b=document.querySelector("#fType button.on");return b?b.dataset.v:"Site Visit";}
-document.querySelectorAll("#fType button").forEach(b=>b.addEventListener("click",()=>setType(b.dataset.v)));
+function updateSiteField(){
+  const sel=getTypes();
+  $("siteField").style.opacity=sel.includes("Site")?"1":".55";
+}
+function getTypes(){
+  const on=[...document.querySelectorAll("#fType button.on")].map(b=>b.dataset.v);
+  return TYPE_ORDER.filter(t=>on.includes(t));
+}
+function setType(v){
+  const sel=typesOf(v);
+  document.querySelectorAll("#fType button").forEach(b=>b.classList.toggle("on",sel.includes(b.dataset.v)));
+  updateSiteField();
+}
+function getType(){return getTypes().join(" + ");}
+document.querySelectorAll("#fType button").forEach(b=>b.addEventListener("click",()=>{
+  const v=b.dataset.v, wasOn=b.classList.contains("on");
+  if(EXCLUSIVE.includes(v)){
+    document.querySelectorAll("#fType button").forEach(x=>x.classList.remove("on"));
+    if(!wasOn)b.classList.add("on");
+  }else{
+    document.querySelectorAll("#fType button").forEach(x=>{if(EXCLUSIVE.includes(x.dataset.v))x.classList.remove("on");});
+    b.classList.toggle("on");
+  }
+  updateSiteField();
+}));
 
 function renderChips(){
   const box=$("chipbox"), inp=$("fSiteInput");
@@ -512,7 +540,7 @@ $("endNow").addEventListener("click",()=>{$("fEnd").value=nowTime();toast("End t
 function resetForm(){
   $("fDate").value=todayStr(); $("fStart").value=""; $("fEnd").value="";
   $("fSummary").value=""; formSites=[]; editId=null;
-  setType("Site Visit"); renderChips();
+  setType("Site"); renderChips();
   $("formTitle").textContent="Log today"; $("saveBtn").textContent="Save entry";
   $("cancelEdit").style.display="none";
 }
@@ -521,6 +549,7 @@ $("cancelEdit").addEventListener("click",resetForm);
 $("saveBtn").addEventListener("click",()=>{
   const date=$("fDate").value;
   if(!date){toast("Pick a date");return;}
+  if(!getType()){toast("Tap at least one day type");return;}
   if($("fSiteInput").value.trim()) addSite($("fSiteInput").value);
   const entry={
     id: editId || (Date.now()+"-"+Math.random().toString(36).slice(2,7)),
@@ -559,16 +588,16 @@ $("monthSel").addEventListener("change",renderStats);
 function renderStats(){
   const m=$("monthSel").value;
   const es=live().filter(e=>e.date.slice(0,7)===m);
-  const worked=es.filter(e=>e.type!=="Leave"&&e.type!=="Day Off");
-  const siteDays=es.filter(e=>e.type==="Site Visit"||e.type==="Office + Site").length;
-  const officeDays=es.filter(e=>e.type==="Office"||e.type==="Office + Site").length;
+  const worked=es.filter(e=>{const ts=typesOf(e.type);return !ts.includes("Leave")&&!ts.includes("Day Off");});
+  const siteDays=es.filter(e=>typesOf(e.type).includes("Site")).length;
+  const officeDays=es.filter(e=>typesOf(e.type).includes("Office")).length;
   const totH=worked.reduce((a,e)=>a+(hours(e)||0),0);
   const siteCount={}; let visits=0;
   es.forEach(e=>(e.sites||[]).forEach(s=>{siteCount[s]=(siteCount[s]||0)+1;visits++;}));
   const uniq=Object.keys(siteCount).length;
   $("stats").innerHTML=
     st(worked.length,"days worked")+st(siteDays,"site days")+
-    st(officeDays,"office days")+st(es.filter(e=>e.type==="Leave"||e.type==="Day Off").length,"leave / off")+
+    st(officeDays,"office days")+st(es.filter(e=>{const ts=typesOf(e.type);return ts.includes("Leave")||ts.includes("Day Off");}).length,"leave / off")+
     st(fmtH(totH),"total hours")+st(worked.length?fmtH(totH/worked.length):"—","avg / day")+
     st(visits,"site visits")+st(uniq,"unique sites");
   const top=Object.entries(siteCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
@@ -589,7 +618,7 @@ function timebar(e){
   const w=Math.max(2,Math.min(100,(h*60/span)*100));
   const l=((s-DAY_S)/span)*100;
   let ticks="";for(let t=8;t<=20;t+=4){ticks+='<span class="tick" style="left:'+(((t*60-DAY_S)/span)*100)+'%"></span>';}
-  return '<div class="timebar">'+ticks+'<span class="fill" style="left:'+l+'%;width:'+Math.min(w,100-l)+'%;background:'+typeColor(e.type)+'"></span></div>';
+  return '<div class="timebar">'+ticks+'<span class="fill" style="left:'+l+'%;width:'+Math.min(w,100-l)+'%;background:'+typeColor(typesOf(e.type)[0]||e.type)+'"></span></div>';
 }
 
 function renderList(){
@@ -615,7 +644,7 @@ function renderList(){
       '<div class="entry-head">'+
         '<span class="d-date">'+fmtDate(e.date)+'</span>'+
         '<span class="d-dow">'+dow(e.date)+'</span>'+
-        '<span class="badge '+typeClass(e.type)+'">'+esc(e.type)+'</span>'+
+        ''+typesOf(e.type).map(t=>'<span class="badge '+typeClass(t)+'">'+esc(t)+'</span>').join("")+''+
         '<span class="d-hours">'+(e.start?esc(e.start):"—")+" → "+(e.end?esc(e.end):"—")+
           (h!=null?' · <b>'+fmtH(h)+'</b>':"")+'</span>'+
       '</div>'+
@@ -718,7 +747,7 @@ function renderToday(){
   } else {
     const h=hours(e);
     const onair=(e.start&&!e.end)?'<span class="onair-pill"><span class="onair-dot"></span>ON AIR · '+esc(e.start)+'</span>':"";
-    el.innerHTML=head+onair+'<div class="today-status"><span class="badge '+typeClass(e.type)+'">'+esc(e.type)+'</span>'+
+    el.innerHTML=head+onair+'<div class="today-status">'+typesOf(e.type).map(t=>'<span class="badge '+typeClass(t)+'">'+esc(t)+'</span>').join("")+''+
       (e.start||"—")+" → "+(e.end||"—")+(h!=null?" · <b>"+fmtH(h)+"</b>":"")+
       ((e.sites&&e.sites.length)?'<div class="sites">'+e.sites.map(s=>'<span class="chip">'+esc(s)+'</span>').join("")+'</div>':"")+
       '</div>';
@@ -802,7 +831,7 @@ attachTimePicker("fEnd");
 /* ---------------- init ---------------- */
 function renderAll(){renderMonthSel();renderStats();renderList();renderSuggest();renderToday();}
 $("fDate").value=todayStr();
-setType("Site Visit");
+setType("Site");
 $("cfgUrl").value=cfg.url||"";
 $("cfgToken").value=cfg.token||"";
 const THEMEKEY="uplink-theme";
